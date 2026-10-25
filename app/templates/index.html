@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Resource Allocation Simulator | Cloud Computing</title>
+    <meta name="description" content="Simulation system for Cloud Computing VM resource allocation heuristics: First Fit, Best Fit, and Round Robin.">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js 4.4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h1>VM Resource Allocation Simulator</h1>
+                    <span class="subtitle">Cloud Computing • Virtual Infrastructure Scheduling</span>
+                </div>
+            </div>
+            <div class="header-status">
+                <div id="api-status-badge" class="status-badge checking">
+                    <span class="status-dot"></span>
+                    <span id="api-status-text">Checking API...</span>
+                </div>
+                <button id="btn-quick-reset" class="btn btn-secondary btn-sm" title="Clear all simulation results">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                    Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Toast / Alert Container -->
+        <div id="alert-container" class="alert-container" role="alert" aria-live="polite"></div>
+
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid" aria-label="Simulation Overview Metrics">
+            <div class="kpi-card" id="kpi-card-hosts">
+                <div class="kpi-header">
+                    <span class="kpi-title">Physical Hosts</span>
+                    <span class="kpi-icon icon-blue">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="2" width="16" height="20" rx="2"></rect>
+                            <line x1="8" y1="6" x2="16" y2="6"></line>
+                            <line x1="8" y1="10" x2="16" y2="10"></line>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-total-hosts">0</div>
+                <div class="kpi-subtext" id="kpi-hosts-sub">0 Cores • 0 GB RAM</div>
+            </div>
+
+            <div class="kpi-card" id="kpi-card-vms">
+                <div class="kpi-header">
+                    <span class="kpi-title">Requested VMs</span>
+                    <span class="kpi-icon icon-indigo">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                            <path d="M12 12v9"></path>
+                            <path d="m8 17 4 4 4-4"></path>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-total-vms">0</div>
+                <div class="kpi-subtext" id="kpi-vms-sub">Pending Workload</div>
+            </div>
+
+            <div class="kpi-card" id="kpi-card-success">
+                <div class="kpi-header">
+                    <span class="kpi-title">Allocated VMs</span>
+                    <span class="kpi-icon icon-emerald">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-allocated-vms">--</div>
+                <div class="kpi-subtext" id="kpi-success-rate">Success Rate: --%</div>
+            </div>
+
+            <div class="kpi-card" id="kpi-card-failed">
+                <div class="kpi-header">
+                    <span class="kpi-title">Failed Allocations</span>
+                    <span class="kpi-icon icon-rose">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-failed-vms">--</div>
+                <div class="kpi-subtext" id="kpi-failed-sub">Over-allocation rejects</div>
+            </div>
+
+            <div class="kpi-card" id="kpi-card-cpu">
+                <div class="kpi-header">
+                    <span class="kpi-title">Cluster CPU Util</span>
+                    <span class="kpi-icon icon-cyan">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                            <rect x="9" y="9" width="6" height="6"></rect>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-cpu-util">--%</div>
+                <div class="progress-bar-bg">
+                    <div id="kpi-cpu-bar" class="progress-bar-fill fill-cyan" style="width: 0%;"></div>
+                </div>
+                <div class="kpi-subtext" id="kpi-cpu-details">Allocated: 0 / 0 Cores</div>
+            </div>
+
+            <div class="kpi-card" id="kpi-card-ram">
+                <div class="kpi-header">
+                    <span class="kpi-title">Cluster RAM Util</span>
+                    <span class="kpi-icon icon-amber">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 19v-3"></path>
+                            <path d="M10 19v-3"></path>
+                            <path d="M14 19v-3"></path>
+                            <path d="M18 19v-3"></path>
+                            <rect x="2" y="5" width="20" height="10" rx="2"></rect>
+                        </svg>
+                    </span>
+                </div>
+                <div class="kpi-value" id="kpi-ram-util">--%</div>
+                <div class="progress-bar-bg">
+                    <div id="kpi-ram-bar" class="progress-bar-fill fill-amber" style="width: 0%;"></div>
+                </div>
+                <div class="kpi-subtext" id="kpi-ram-details">Allocated: 0 / 0 GB</div>
+            </div>
+        </section>
+
+        <!-- Configuration & Controls Section -->
+        <div class="dashboard-layout">
+            <!-- Left Panel: Host & VM Config -->
+            <div class="config-column">
+                <!-- Physical Hosts Configuration Panel -->
+                <section class="panel" aria-labelledby="hosts-panel-title">
+                    <div class="panel-header">
+                        <h2 id="hosts-panel-title">Physical Hosts Pool</h2>
+                        <span class="badge" id="host-count-badge">0 Hosts</span>
+                    </div>
+                    <form id="form-add-host" class="form-grid">
+                        <div class="input-group">
+                            <label for="host-id-input">Host ID</label>
+                            <input type="text" id="host-id-input" placeholder="e.g. host-1" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="host-name-input">Host Name</label>
+                            <input type="text" id="host-name-input" placeholder="e.g. Server Node Alpha">
+                        </div>
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label for="host-cpu-input">CPU Cores</label>
+                                <input type="number" id="host-cpu-input" min="1" step="1" placeholder="Cores" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="host-ram-input">RAM (GB)</label>
+                                <input type="number" id="host-ram-input" min="0.5" step="0.5" placeholder="GB" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Physical Host
+                        </button>
+                    </form>
+
+                    <!-- Hosts Table / List -->
+                    <div class="table-wrapper host-table-wrapper">
+                        <table class="data-table" id="table-hosts">
+                            <thead>
+                                <tr>
+                                    <th>Host</th>
+                                    <th>Total CPU</th>
+                                    <th>Total RAM</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hosts-tbody">
+                                <tr>
+                                    <td colspan="4" class="empty-table-msg">No physical hosts added yet. Add hosts or load a preset below.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Virtual Machine Workload Panel -->
+                <section class="panel" aria-labelledby="vms-panel-title">
+                    <div class="panel-header">
+                        <h2 id="vms-panel-title">VM Workload Queue</h2>
+                        <span class="badge" id="vm-count-badge">0 VMs</span>
+                    </div>
+
+                    <!-- Presets Selection -->
+                    <div class="presets-container">
+                        <span class="presets-label">Workload Presets:</span>
+                        <div class="preset-buttons">
+                            <button type="button" class="btn btn-preset" id="preset-balanced" title="Balanced load across hosts">
+                                Balanced
+                            </button>
+                            <button type="button" class="btn btn-preset" id="preset-cpu" title="CPU intensive compute instances">
+                                CPU-Heavy
+                            </button>
+                            <button type="button" class="btn btn-preset" id="preset-ram" title="Memory intensive caching instances">
+                                RAM-Heavy
+                            </button>
+                            <button type="button" class="btn btn-preset" id="preset-overloaded" title="Workload exceeding capacity to test reject handling">
+                                Overloaded
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="form-add-vm" class="form-grid">
+                        <div class="input-group">
+                            <label for="vm-id-input">VM ID</label>
+                            <input type="text" id="vm-id-input" placeholder="e.g. vm-web-01" required>
+                        </div>
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label for="vm-cpu-input">Required CPU</label>
+                                <input type="number" id="vm-cpu-input" min="0.5" step="0.5" placeholder="Cores" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="vm-ram-input">Required RAM</label>
+                                <input type="number" id="vm-ram-input" min="0.5" step="0.5" placeholder="GB" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add VM Request
+                        </button>
+                    </form>
+
+                    <!-- VMs Table -->
+                    <div class="table-wrapper vm-table-wrapper">
+                        <table class="data-table" id="table-vms">
+                            <thead>
+                                <tr>
+                                    <th>VM ID</th>
+                                    <th>Req CPU</th>
+                                    <th>Req RAM</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vms-tbody">
+                                <tr>
+                                    <td colspan="4" class="empty-table-msg">No VM requests in queue.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Panel: Simulation Controls, Charts & Live Racks -->
+            <div class="simulation-column">
+                <!-- Algorithm Controls Panel -->
+                <section class="panel control-panel" aria-label="Allocation Execution Controls">
+                    <div class="control-header">
+                        <div>
+                            <h2>Allocation Engine</h2>
+                            <p class="section-desc">Select an allocation algorithm or run all three side-by-side for a benchmark comparison.</p>
+                        </div>
+                        <div id="sim-active-badge" class="mode-badge standby">Standby</div>
+                    </div>
+                    
+                    <div class="algorithm-buttons">
+                        <button id="btn-run-ff" class="btn btn-algo" title="Allocate to the first host that fits">
+                            <span class="algo-name">First Fit</span>
+                            <span class="algo-sub">Fastest sequential</span>
+                        </button>
+                        <button id="btn-run-bf" class="btn btn-algo" title="Allocate to host leaving minimum residual resources">
+                            <span class="algo-name">Best Fit</span>
+                            <span class="algo-sub">Min residual capacity</span>
+                        </button>
+                        <button id="btn-run-rr" class="btn btn-algo" title="Circular round-robin across hosts">
+                            <span class="algo-name">Round Robin</span>
+                            <span class="algo-sub">Even load distribution</span>
+                        </button>
+                        <button id="btn-run-compare" class="btn btn-compare" title="Run all 3 algorithms on the same workload">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 3h5v5"></path>
+                                <path d="M8 3H3v5"></path>
+                                <path d="M21 3l-7 7"></path>
+                                <path d="M3 3l7 7"></path>
+                                <path d="M16 21h5v-5"></path>
+                                <path d="M8 21H3v-5"></path>
+                                <path d="M21 21l-7-7"></path>
+                                <path d="M3 21l7-7"></path>
+                            </svg>
+                            Compare All Algorithms
+                        </button>
+                    </div>
+
+                    <!-- Loading Spinner Overlay -->
+                    <div id="loading-overlay" class="loading-overlay hidden">
+                        <div class="spinner"></div>
+                        <span id="loading-msg">Executing allocation simulation...</span>
+                    </div>
+                </section>
+
+                <!-- Comparison Summary Table (Visible after Compare All) -->
+                <section id="comparison-summary-panel" class="panel hidden" aria-labelledby="comp-title">
+                    <div class="panel-header">
+                        <h2 id="comp-title">Algorithm Benchmark Comparison</h2>
+                        <span class="badge badge-success">Fair Comparison Run</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table" id="table-comparison">
+                            <thead>
+                                <tr>
+                                    <th>Algorithm</th>
+                                    <th>Success Rate</th>
+                                    <th>Allocated / Total VMs</th>
+                                    <th>CPU Util</th>
+                                    <th>RAM Util</th>
+                                    <th>Remaining Capacity</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparison-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Charts Visualization Grid -->
+                <section class="charts-grid" aria-label="Resource Allocation Charts">
+                    <!-- Chart 1: Per-Host Utilization -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Per-Host Resource Utilization (%)</h3>
+                            <span class="chart-unit">CPU vs RAM</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-host-utilization"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Algorithm Comparison (Comparison Mode) or CPU vs RAM Allocated -->
+                    <div class="chart-card" id="card-comparison-chart">
+                        <div class="chart-header">
+                            <h3 id="chart-benchmark-title">Algorithm Performance Comparison</h3>
+                            <span class="chart-unit" id="chart-benchmark-unit">Util & Success Rate</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-comparison"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 3: Cluster Resource Allocation -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Total Cluster Allocation</h3>
+                            <span class="chart-unit">Allocated vs Remaining</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-resource-capacity"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 4: Allocation Outcomes -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Allocation Outcomes</h3>
+                            <span class="chart-unit">VM Placements</span>
+                        </div>
+                        <div class="chart-container chart-doughnut-container">
+                            <canvas id="chart-outcomes"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Physical Host Racks Visualizer -->
+                <section class="panel" aria-labelledby="racks-title">
+                    <div class="panel-header">
+                        <h2 id="racks-title">Host Server Racks State</h2>
+                        <span class="badge" id="racks-state-badge">Unallocated</span>
+                    </div>
+                    <div id="host-racks-grid" class="host-racks-grid">
+                        <div class="empty-state-box">Run an allocation simulation to inspect server rack utilization.</div>
+                    </div>
+                </section>
+
+                <!-- VM Allocation Results Table -->
+                <section class="panel" aria-labelledby="results-title">
+                    <div class="panel-header">
+                        <h2 id="results-title">VM Allocation Placements</h2>
+                        <div class="filter-controls">
+                            <label for="filter-vm-status" class="sr-only">Filter by Status</label>
+                            <select id="filter-vm-status" class="select-sm">
+                                <option value="all">All VMs</option>
+                                <option value="allocated">Allocated Only</option>
+                                <option value="rejected">Rejected Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table" id="table-results">
+                            <thead>
+                                <tr>
+                                    <th>VM ID</th>
+                                    <th>Required CPU</th>
+                                    <th>Required RAM</th>
+                                    <th>Status</th>
+                                    <th>Assigned Host</th>
+                                    <th>Placement Details / Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-tbody">
+                                <tr>
+                                    <td colspan="6" class="empty-table-msg">Run an algorithm to view VM placement details.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-container">
+            <p><strong>VM Resource Allocation Simulator</strong> • Cloud Computing Mini-Project</p>
+            <p class="footer-credits">Heuristics: First Fit • Best Fit (Normalized Residual Score) • Round Robin</p>
+        </div>
+    </footer>
+
+    <!-- Workload Preset Confirmation Modal -->
+    <div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-card">
+            <h3 id="confirm-modal-title" style="margin-bottom: 0.5rem; font-size: 1.1rem;">Load Preset Workload?</h3>
+            <p id="confirm-modal-msg" style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4;">
+                Loading this preset will replace your currently configured physical hosts and VM requests.
+            </p>
+            <div class="modal-actions">
+                <button type="button" id="btn-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="btn-modal-confirm" class="btn btn-primary">Replace &amp; Load</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Frontend Application Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
